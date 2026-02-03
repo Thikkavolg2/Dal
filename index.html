@@ -3,86 +3,121 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bikkuchan Cloth Sim</title>
+    <title>Bikkuchan Cloth Sim v3</title>
     <style>
       body {
         margin: 0;
-        background: #0a0a0a;
+        background: #0f172a;
         overflow: hidden;
         touch-action: none;
-        font-family: 'Segoe UI', sans-serif;
+        font-family: 'Segoe UI', Roboto, sans-serif;
       }
       canvas { display: block; }
 
-      /* Message Overlay */
-      #msg-overlay {
+      /* --- Custom Welcome Popup --- */
+      #welcome-box {
         position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: rgba(255, 255, 255, 0.95);
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        display: flex; justify-content: center; align-items: center;
+        z-index: 1000;
+        backdrop-filter: blur(8px);
+      }
+      .popup {
+        background: #1e293b;
+        padding: 30px;
+        border-radius: 20px;
+        text-align: center;
+        width: 85%;
+        max-width: 350px;
+        border: 2px solid #38bdf8;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        color: white;
+      }
+      .popup h2 { color: #38bdf8; margin-bottom: 10px; }
+      .popup input {
+        width: 90%;
+        padding: 12px;
+        margin: 15px 0;
+        border-radius: 10px;
+        border: none;
+        outline: none;
+        font-size: 16px;
+      }
+      .btn-ok {
+        background: #38bdf8;
+        color: #0f172a;
+        border: none; padding: 10px 25px;
+        border-radius: 10px; font-weight: bold; cursor: pointer;
+        width: 100%; font-size: 16px;
+      }
+
+      /* --- Warning Popup (When broken) --- */
+      #warning-box {
+        position: fixed;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%) scale(0);
+        background: #7f1d1d;
+        color: white;
         padding: 25px;
         border-radius: 20px;
         text-align: center;
-        width: 80%;
-        max-width: 400px;
-        display: none; /* පස්සේ පේන්න හදන්නේ */
-        box-shadow: 0 0 30px rgba(255, 0, 0, 0.5);
-        z-index: 100;
-        border: 4px solid #ff4757;
+        width: 85%;
+        max-width: 380px;
+        z-index: 2000;
+        border: 4px solid #f87171;
+        box-shadow: 0 0 50px rgba(248, 113, 113, 0.5);
+        transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       }
-
-      #msg-overlay h2 { color: #ff4757; margin-top: 0; }
-      #msg-overlay p { font-size: 18px; color: #333; font-weight: bold; line-height: 1.5; }
-      
-      .btn-reload {
-        background: #2ed573;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 10px;
-        font-size: 16px;
-        cursor: pointer;
-        margin-top: 15px;
+      #warning-box.show { transform: translate(-50%, -50%) scale(1); }
+      #warning-box p { font-size: 18px; line-height: 1.6; font-weight: 500; }
+      .btn-reset {
+        background: #f87171; color: white; border: none;
+        padding: 12px 20px; border-radius: 10px; cursor: pointer;
+        margin-top: 15px; font-weight: bold; width: 100%;
       }
     </style>
   </head>
   <body>
 
-    <div id="msg-overlay">
-      <h2>අඩෝ... 😡</h2>
+    <div id="welcome-box">
+      <div class="popup">
+        <h2>ආයුබෝවන්! 👋</h2>
+        <p>ඔයාගේ නම ටයිප් කරලා පටන් ගන්න.</p>
+        <input type="text" id="name-input" placeholder="මෙතන නම ලියන්න...">
+        <button class="btn-ok" onclick="startGame()">පටන් ගමු</button>
+      </div>
+    </div>
+
+    <div id="warning-box">
+      <h2 style="margin-top:0">අඩෝ... 😡</h2>
       <p id="funny-text"></p>
-      <button class="btn-reload" onclick="location.reload()">හරි හරි හදන්නම් 🥺</button>
+      <button class="btn-reset" onclick="location.reload()">හරි හරි හදන්නම් 🥺</button>
     </div>
 
     <canvas id="canvas"></canvas>
 
     <script>
-      // 1. නම අහන වැඩේ
-      let userName = prompt("ඔයාගේ නම මොකක්ද?", "");
-      if (userName === null || userName.trim() === "") {
-        userName = "උබ"; // නමක් නැති අයට
-      } else {
-        userName = userName.trim();
-      }
-
       const canvas = document.getElementById("canvas");
       const ctx = canvas.getContext("2d");
-      const msgOverlay = document.getElementById("msg-overlay");
-      const funnyText = document.getElementById("funny-text");
+      let userName = "උබ";
+      let isGameActive = false;
 
-      let points = [];
-      let sticks = [];
-      let totalSticks = 0;
-      let brokenSticks = 0;
-      let isGameOver = false;
+      // Start Game Function
+      function startGame() {
+        let input = document.getElementById("name-input").value;
+        if (input.trim() !== "") userName = input.trim();
+        document.getElementById("welcome-box").style.display = "none";
+        isGameActive = true;
+        init();
+      }
+
+      let points = [], sticks = [];
+      let totalSticks = 0, brokenSticks = 0, isGameOver = false;
       let mouse = { x: 0, y: 0, px: 0, py: 0, down: false };
 
-      const spacing = 15;
-      const width = 25;   
-      const height = 18;
-      const gravity = 0.5;
-      const friction = 0.98;
+      const spacing = 15, width = 25, height = 18;
+      const gravity = 0.5, friction = 0.98;
 
       class Point {
         constructor(x, y, pinned = false) {
@@ -108,31 +143,23 @@
           let dx = this.p2.x - this.p1.x;
           let dy = this.p2.y - this.p1.y;
           let distance = Math.hypot(dx, dy);
-          
           if (distance > this.length * 2.5) {
-              this.active = false;
-              brokenSticks++;
-              checkDamage(); // හානිය පරීක්ෂා කරනවා
+            this.active = false;
+            brokenSticks++;
+            if (!isGameOver && brokenSticks > totalSticks * 0.8) {
+              showWarning();
+            }
           }
-
-          let difference = this.length - distance;
-          let percent = difference / distance / 2;
-          let offsetX = dx * percent; let offsetY = dy * percent;
-
-          if (!this.p1.pinned) { this.p1.x -= offsetX; this.p1.y -= offsetY; }
-          if (!this.p2.pinned) { this.p2.x += offsetX; this.p2.y += offsetY; }
+          let diff = (this.length - distance) / distance / 2;
+          if (!this.p1.pinned) { this.p1.x -= dx * diff; this.p1.y -= dy * diff; }
+          if (!this.p2.pinned) { this.p2.x += dx * diff; this.p2.y += dy * diff; }
         }
       }
 
-      function checkDamage() {
-          // දැලෙන් 85% කට වඩා කැඩුනම මැසේජ් එක පෙන්වනවා
-          if (!isGameOver && brokenSticks > totalSticks * 0.85) {
-              isGameOver = true;
-              funnyText.innerText = `${userName} උබ දැල කැඩුවනම් හදල දීපම් නැත්තම් ,මං තොට පොල්ලක් අරන් දෙනව කරටි කැඩෙන්න 🥺😂😂 බික්කුච්චන්`;
-              setTimeout(() => {
-                msgOverlay.style.display = "block";
-              }, 500);
-          }
+      function showWarning() {
+        isGameOver = true;
+        document.getElementById("funny-text").innerText = `${userName} උබ දැල කැඩුවනම් හදල දීපම් නැත්තම් ,මං තොට පොල්ලක් අරන් දෙනව කරටි කැඩෙන්න 🥺😂😂 බික්කුච්චන්`;
+        document.getElementById("warning-box").classList.add("show");
       }
 
       function init() {
@@ -140,7 +167,6 @@
         canvas.height = window.innerHeight;
         points = []; sticks = []; brokenSticks = 0;
         let offset = (canvas.width - width * spacing) / 2;
-
         for (let y = 0; y <= height; y++) {
           for (let x = 0; x <= width; x++) {
             let p = new Point(x * spacing + offset, y * spacing + 50, y === 0);
@@ -153,9 +179,9 @@
       }
 
       function update() {
+        if (!isGameActive) return requestAnimationFrame(update);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        points.forEach((p) => {
+        points.forEach(p => {
           p.update();
           if (mouse.down) {
             let d = Math.hypot(p.x - mouse.x, p.y - mouse.y);
@@ -165,42 +191,32 @@
             }
           }
         });
-
-        for (let i = 0; i < 5; i++) {
-          sticks.forEach((s) => s.update());
-        }
-
+        for (let i = 0; i < 5; i++) sticks.forEach(s => s.update());
         ctx.beginPath();
-        ctx.strokeStyle = "#00d4ff";
+        ctx.strokeStyle = "#38bdf8";
         ctx.lineWidth = 1.5;
-        sticks.forEach((s) => {
+        sticks.forEach(s => {
           if (!s.active) return;
-          ctx.moveTo(s.p1.x, s.p1.y);
-          ctx.lineTo(s.p2.x, s.p2.y);
+          ctx.moveTo(s.p1.x, s.p1.y); ctx.lineTo(s.p2.x, s.p2.y);
         });
         ctx.stroke();
-
         mouse.px = mouse.x; mouse.py = mouse.y;
         requestAnimationFrame(update);
       }
 
       function setMouse(e) {
-        const rect = canvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const t = e.touches ? e.touches[0] : e;
         mouse.px = mouse.x; mouse.py = mouse.y;
-        mouse.x = clientX - rect.left; mouse.y = clientY - rect.top;
+        mouse.x = t.clientX; mouse.y = t.clientY;
       }
+      canvas.onmousedown = e => { mouse.down = true; setMouse(e); };
+      window.onmouseup = () => mouse.down = false;
+      canvas.onmousemove = setMouse;
+      canvas.ontouchstart = e => { mouse.down = true; setMouse(e); mouse.px = mouse.x; mouse.py = mouse.y; };
+      canvas.ontouchend = () => mouse.down = false;
+      canvas.ontouchmove = e => { e.preventDefault(); setMouse(e); };
 
-      canvas.addEventListener("mousedown", (e) => { mouse.down = true; setMouse(e); });
-      window.addEventListener("mouseup", () => { mouse.down = false; });
-      canvas.addEventListener("mousemove", setMouse);
-      canvas.addEventListener("touchstart", (e) => { mouse.down = true; setMouse(e); mouse.px = mouse.x; mouse.py = mouse.y; }, { passive: false });
-      canvas.addEventListener("touchend", () => { mouse.down = false; });
-      canvas.addEventListener("touchmove", (e) => { e.preventDefault(); setMouse(e); }, { passive: false });
-
-      window.addEventListener("resize", init);
-      init();
+      window.onresize = init;
       update();
     </script>
   </body>
